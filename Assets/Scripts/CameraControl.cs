@@ -1,69 +1,83 @@
 ﻿using UnityEngine;
+using System.Collections.Generic;
 
 public class CameraControl : MonoBehaviour
 {
-    // Define Constants //
-    public float speedV = 3.0f;
+    public float sensitivityX = 2.0F;
+    public float sensitivityY = 2.0F;
 
-    // Initialize Variables //
-    public Camera firstPerson;
-    public Camera thirdPerson;
-    public GameObject player;
-    public PlayerControl playerControl;
-    public KeyMap keyMap;
-    private Vector3 offset;
-    private float pitch = 0;
+    public float minimumX = -360F;
+    public float maximumX = 360F;
 
-    void Start()
-    {
-        // Set Camera Defaults //
-        firstPerson.enabled = true;
-        thirdPerson.enabled = false;
-        firstPerson.GetComponent<AudioListener>().enabled = firstPerson.GetComponent<AudioListener>().enabled;
-        thirdPerson.GetComponent<AudioListener>().enabled = !thirdPerson.GetComponent<AudioListener>().enabled;
-    }
+    public float minimumY = -60F;
+    public float maximumY = 60F;
+
+    private float rotationX = 0F;
+    private float rotationY = 0F;
+
+    private List<float> rotArrayX = new List<float>();
+    float rotAverageX = 0F;
+
+    private List<float> rotArrayY = new List<float>();
+    float rotAverageY = 0F;
+
+    public float frameCounter = 6;
 
     void Update()
     {
-        // Assign Needed Objects & Components to Variables //
-        player = GameObject.Find("Player");
-        playerControl = player.GetComponent<PlayerControl>();
-        keyMap = player.GetComponent<KeyMap>();
+        rotAverageY = 0f;
+        rotAverageX = 0f;
 
-        pitch -= speedV * keyMap.mouseY;
-        pitch %= 360;
+        rotationY += Input.GetAxisRaw("Mouse Y") * sensitivityY;
+        rotationX += Input.GetAxisRaw("Mouse X") * sensitivityX;
+
+        rotArrayY.Add(rotationY);
+        rotArrayX.Add(rotationX);
+
+        if (rotArrayY.Count >= frameCounter)
+        {
+            rotArrayY.RemoveAt(0);
+        }
+        if (rotArrayX.Count >= frameCounter)
+        {
+            rotArrayX.RemoveAt(0);
+        }
+
+        for (int j = 0; j < rotArrayY.Count; j++)
+        {
+            rotAverageY += rotArrayY[j];
+        }
+        for (int i = 0; i < rotArrayX.Count; i++)
+        {
+            rotAverageX += rotArrayX[i];
+        }
+
+        rotAverageY /= rotArrayY.Count;
+        rotAverageX /= rotArrayX.Count;
+
+        rotAverageY = ClampAngle(rotAverageY, minimumY, maximumY);
+        rotAverageX = ClampAngle(rotAverageX, minimumX, maximumX);
+
+        Quaternion yQuaternion = Quaternion.AngleAxis(rotAverageY, Vector3.left);
+        Quaternion xQuaternion = Quaternion.AngleAxis(rotAverageX, Vector3.up);
+
+        transform.rotation = Quaternion.Lerp(transform.rotation, xQuaternion, 1.0f) * Quaternion.Lerp(transform.rotation, yQuaternion, 1.0f);
     }
 
-    void LateUpdate()
+    public static float ClampAngle(float angle, float min, float max)
     {
-        if (pitch > 89) pitch = 89;
-        else if (pitch < -89) pitch = -89;
-
-        if (keyMap.scroll / Mathf.Abs(keyMap.scroll) == 1)
+        angle = angle % 360;
+        if ((angle >= -360F) && (angle <= 360F))
         {
-            thirdPerson.enabled = false;
-            thirdPerson.GetComponent<AudioListener>().enabled = !thirdPerson.GetComponent<AudioListener>().enabled;
-            firstPerson.enabled = true;
-            transform.eulerAngles = new Vector3(0, transform.eulerAngles.y, 0);
-            pitch = 0;
-
+            if (angle < -360F)
+            {
+                angle += 360F;
+            }
+            if (angle > 360F)
+            {
+                angle -= 360F;
+            }
         }
-        else if (keyMap.scroll / Mathf.Abs(keyMap.scroll) == -1)
-        {
-            firstPerson.enabled = false;
-            firstPerson.GetComponent<AudioListener>().enabled = !firstPerson.GetComponent<AudioListener>().enabled;
-            thirdPerson.enabled = true;
-        }
-
-        if (firstPerson.enabled)
-        {
-            transform.eulerAngles = new Vector3(pitch, playerControl.yaw, 0);
-        }
-        else if (thirdPerson.enabled)
-        {
-            transform.eulerAngles = new Vector3(17, playerControl.yaw, 0);
-        }
-
-
+        return Mathf.Clamp(angle, min, max);
     }
 }
